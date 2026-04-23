@@ -11,16 +11,19 @@ const nextStatusMap = {
 const AdminPage = ({ onThemeToggle }) => {
   const [orders, setOrders] = useState([]);
   const [waiterCalls, setWaiterCalls] = useState([]);
+  const [sessions, setSessions] = useState([]);
 
   useEffect(() => {
     const hydrateOrders = async () => {
       try {
-        const [ordersResponse, callsResponse] = await Promise.all([
+        const [ordersResponse, callsResponse, sessionsResponse] = await Promise.all([
           api.get("/orders"),
           api.get("/waiter-calls"),
+          api.get("/sessions"),
         ]);
         setOrders(ordersResponse.data);
         setWaiterCalls(callsResponse.data);
+        setSessions(sessionsResponse.data);
       } catch (error) {
         console.error("Failed to fetch orders", error);
       }
@@ -83,6 +86,16 @@ const AdminPage = ({ onThemeToggle }) => {
       );
     });
 
+    socket.on("session:created", (session) => {
+      setSessions((prev) => [session, ...prev]);
+    });
+
+    socket.on("session:updated", (updatedSession) => {
+      setSessions((prev) =>
+        prev.map((s) => (s._id === updatedSession._id ? updatedSession : s))
+      );
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -107,6 +120,14 @@ const AdminPage = ({ onThemeToggle }) => {
     }
   };
 
+  const updateSessionStatus = async (sessionId, status) => {
+    try {
+      await api.put(`/sessions/${sessionId}`, { status });
+    } catch (error) {
+      console.error("Failed to update session status", error);
+    }
+  };
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6">
       <header className="mb-5 flex items-center justify-between">
@@ -118,6 +139,68 @@ const AdminPage = ({ onThemeToggle }) => {
           Toggle Theme
         </button>
       </header>
+
+      <section className="mb-8">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold">Table Sessions</h2>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold dark:bg-slate-800">
+            {sessions.filter((s) => s.status === "ACTIVE").length} Active Tables
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {sessions
+            .filter((s) => s.status !== "CLOSED")
+            .map((session) => (
+              <article
+                key={session._id}
+                className={`rounded-2xl p-4 ring-1 transition ${
+                  session.status === "ACTIVE"
+                    ? "bg-emerald-50 ring-emerald-200 dark:bg-emerald-900/10 dark:ring-emerald-800"
+                    : "bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+                }`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Table
+                    </p>
+                    <p className="text-xl font-bold">#{session.tableNumber}</p>
+                  </div>
+                  <span
+                    className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-tight ${
+                      session.status === "ACTIVE"
+                        ? "bg-emerald-500 text-white"
+                        : "bg-amber-400 text-slate-900"
+                    }`}
+                  >
+                    {session.status}
+                  </span>
+                </div>
+                <p className="mb-4 text-[10px] text-slate-400">
+                  Created: {new Date(session.createdAt).toLocaleTimeString()}
+                </p>
+                {session.status === "INACTIVE" ? (
+                  <button
+                    onClick={() => updateSessionStatus(session._id, "ACTIVE")}
+                    className="w-full rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                  >
+                    Activate Table
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => updateSessionStatus(session._id, "CLOSED")}
+                    className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white transition hover:bg-rose-600"
+                  >
+                    Deactivate Table
+                  </button>
+                )}
+              </article>
+            ))}
+        </div>
+        {sessions.length === 0 && (
+          <p className="text-center text-sm text-slate-500 py-4">No table sessions found.</p>
+        )}
+      </section>
 
       <section className="mb-6">
         <h2 className="mb-3 text-lg font-bold">Waiter Calls</h2>

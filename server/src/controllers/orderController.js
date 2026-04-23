@@ -5,10 +5,21 @@ const calculateTotal = (items) =>
 
 const createOrder = async (req, res, next) => {
   try {
-    const { items, tableNumber } = req.body;
+    const { items, tableNumber, sessionId } = req.body;
 
     if (!tableNumber) {
       return res.status(400).json({ message: "Table number is required." });
+    }
+
+    if (!sessionId) {
+      return res.status(400).json({ message: "Session ID is required." });
+    }
+
+    const Session = require("../models/Session");
+    const session = await Session.findOne({ sessionId });
+
+    if (!session || session.status !== "ACTIVE") {
+      return res.status(403).json({ message: "Table is not active. Please contact staff." });
     }
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -23,6 +34,7 @@ const createOrder = async (req, res, next) => {
 
     const order = await Order.create({
       tableNumber: String(tableNumber),
+      sessionId,
       items,
       totalPrice,
       status: "Pending",

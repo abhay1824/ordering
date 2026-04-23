@@ -4,6 +4,7 @@ const morgan = require("morgan");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const waiterCallRoutes = require("./routes/waiterCallRoutes");
+const sessionRoutes = require("./routes/sessionRoutes");
 const errorHandler = require("./utils/errorHandler");
 
 const app = express();
@@ -32,6 +33,14 @@ app.use(
     next();
   },
   waiterCallRoutes
+);
+app.use(
+  "/api/sessions",
+  (req, res, next) => {
+    req.io = app.get("io");
+    next();
+  },
+  sessionRoutes
 );
 
 app.use(errorHandler);

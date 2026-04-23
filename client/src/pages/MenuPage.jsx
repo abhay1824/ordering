@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../services/api";
 import ProductCard from "../components/ProductCard";
@@ -6,6 +6,7 @@ import StickyCartButton from "../components/StickyCartButton";
 import CartDrawer from "../components/CartDrawer";
 import DishDetailsModal from "../components/DishDetailsModal";
 import { useCart } from "../hooks/useCart";
+import SessionOverlay from "../components/SessionOverlay";
 
 const categories = [
   { id: "Pizza", label: "Pizza", emoji: "🍕" },
@@ -25,6 +26,9 @@ const MenuPage = ({ onThemeToggle }) => {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [callingWaiter, setCallingWaiter] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
+  const [sessionStatus, setSessionStatus] = useState("INACTIVE"); // INACTIVE, ACTIVE, CLOSED
+  const initRef = useRef(false);
 
   const tableNumber = searchParams.get("table") || "1";
 
@@ -43,6 +47,42 @@ const MenuPage = ({ onThemeToggle }) => {
     getProducts();
   }, []);
 
+  // Session Logic
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+
+    const initSession = async () => {
+      try {
+        const response = await api.post("/sessions", { tableNumber });
+        setSession(response.data);
+        setSessionStatus(response.data.status);
+      } catch (error) {
+        console.error("Failed to initialize session:", error);
+      }
+    };
+
+    initSession();
+  }, [tableNumber]);
+
+  // Polling for session status
+  useEffect(() => {
+    if (sessionStatus === "ACTIVE" || !session?.sessionId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await api.get(`/sessions/status/${session.sessionId}`);
+        if (response.data.status !== sessionStatus) {
+          setSessionStatus(response.data.status);
+        }
+      } catch (error) {
+        console.error("Polling failed:", error);
+      }
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [session?.sessionId, sessionStatus]);
+
   const filteredProducts = useMemo(
     () => products.filter((product) => product.category === activeCategory),
     [products, activeCategory]
@@ -58,6 +98,7 @@ const MenuPage = ({ onThemeToggle }) => {
       setPlacingOrder(true);
       const response = await api.post("/orders", {
         tableNumber,
+        sessionId: session?.sessionId,
         items,
         totalPrice,
         status: "Pending",
@@ -196,6 +237,7 @@ const MenuPage = ({ onThemeToggle }) => {
         onAdd={addItem}
         onOrderNow={orderNowFromDish}
       />
+      <SessionOverlay status={sessionStatus} />
     </main>
   );
 };

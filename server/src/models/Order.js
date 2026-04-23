@@ -32,6 +32,11 @@ const orderSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    sessionId: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     items: {
       type: [orderItemSchema],
       validate: [(items) => items.length > 0, "Order must have at least one item."],
