@@ -105,9 +105,45 @@ const getSessionStatus = async (req, res, next) => {
   }
 };
 
+const getSessionBill = async (req, res, next) => {
+  try {
+    const { sessionId } = req.params;
+    const Order = require("../models/Order");
+
+    const orders = await Order.find({ sessionId });
+
+    const bill = {
+      items: [],
+      totalAmount: 0,
+    };
+
+    orders.forEach((order) => {
+      order.items.forEach((item) => {
+        const existingItem = bill.items.find((i) => i.product.toString() === item.product.toString());
+        if (existingItem) {
+          existingItem.quantity += item.quantity;
+        } else {
+          bill.items.push({
+            product: item.product,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+          });
+        }
+      });
+      bill.totalAmount += order.totalPrice;
+    });
+
+    return res.status(200).json(bill);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   getOrCreateSession,
   updateSessionStatus,
   getSessions,
   getSessionStatus,
+  getSessionBill,
 };

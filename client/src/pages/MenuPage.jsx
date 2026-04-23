@@ -7,6 +7,7 @@ import CartDrawer from "../components/CartDrawer";
 import DishDetailsModal from "../components/DishDetailsModal";
 import { useCart } from "../hooks/useCart";
 import SessionOverlay from "../components/SessionOverlay";
+import BillModal from "../components/BillModal";
 
 const categories = [
   { id: "Pizza", label: "Pizza", emoji: "🍕" },
@@ -28,6 +29,8 @@ const MenuPage = ({ onThemeToggle }) => {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   const [sessionStatus, setSessionStatus] = useState("INACTIVE"); // INACTIVE, ACTIVE, CLOSED
+  const [showBill, setShowBill] = useState(false);
+  const [billData, setBillData] = useState(null);
   const initRef = useRef(false);
 
   const tableNumber = searchParams.get("table") || "1";
@@ -128,6 +131,18 @@ const MenuPage = ({ onThemeToggle }) => {
     }
   };
 
+  const fetchBill = async () => {
+    if (!session?.sessionId) return;
+    try {
+      const response = await api.get(`/sessions/status/${session.sessionId}/bill`);
+      setBillData(response.data);
+      setShowBill(true);
+    } catch (error) {
+      console.error("Failed to fetch bill:", error);
+      alert("Unable to generate bill at the moment.");
+    }
+  };
+
   const orderNowFromDish = (dish) => {
     addItem(dish);
     setSelectedDish(null);
@@ -170,6 +185,13 @@ const MenuPage = ({ onThemeToggle }) => {
               disabled={callingWaiter}
             >
               {callingWaiter ? "Calling..." : "Call waiter"}
+            </button>
+            <button
+              type="button"
+              className="rounded-2xl bg-slate-900/10 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-white/30 backdrop-blur-sm transition hover:bg-slate-900/20 dark:bg-white/10"
+              onClick={fetchBill}
+            >
+              Bill
             </button>
             <button
               type="button"
@@ -238,6 +260,12 @@ const MenuPage = ({ onThemeToggle }) => {
         onOrderNow={orderNowFromDish}
       />
       <SessionOverlay status={sessionStatus} />
+      <BillModal
+        isOpen={showBill}
+        onClose={() => setShowBill(false)}
+        bill={billData}
+        tableNumber={tableNumber}
+      />
     </main>
   );
 };

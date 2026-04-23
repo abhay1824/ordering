@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { api, socketUrl } from "../services/api";
+import BillModal from "../components/BillModal";
 
 const nextStatusMap = {
   Pending: "Preparing",
@@ -12,6 +13,9 @@ const AdminPage = ({ onThemeToggle }) => {
   const [orders, setOrders] = useState([]);
   const [waiterCalls, setWaiterCalls] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [showBill, setShowBill] = useState(false);
+  const [selectedBillTable, setSelectedBillTable] = useState(null);
+  const [billData, setBillData] = useState(null);
 
   useEffect(() => {
     const hydrateOrders = async () => {
@@ -128,6 +132,17 @@ const AdminPage = ({ onThemeToggle }) => {
     }
   };
 
+  const fetchBillForAdmin = async (session) => {
+    try {
+      const response = await api.get(`/sessions/status/${session.sessionId}/bill`);
+      setBillData(response.data);
+      setSelectedBillTable(session.tableNumber);
+      setShowBill(true);
+    } catch (error) {
+      console.error("Failed to fetch bill", error);
+    }
+  };
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6">
       <header className="mb-5 flex items-center justify-between">
@@ -179,21 +194,32 @@ const AdminPage = ({ onThemeToggle }) => {
                 <p className="mb-4 text-[10px] text-slate-400">
                   Created: {new Date(session.createdAt).toLocaleTimeString()}
                 </p>
-                {session.status === "INACTIVE" ? (
+                <div className="flex gap-2">
                   <button
-                    onClick={() => updateSessionStatus(session._id, "ACTIVE")}
-                    className="w-full rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    onClick={() => fetchBillForAdmin(session)}
+                    className="shrink-0 rounded-xl bg-slate-200 p-2.5 transition hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    title="View Bill"
                   >
-                    Activate Table
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
                   </button>
-                ) : (
-                  <button
-                    onClick={() => updateSessionStatus(session._id, "CLOSED")}
-                    className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white transition hover:bg-rose-600"
-                  >
-                    Deactivate Table
-                  </button>
-                )}
+                  {session.status === "INACTIVE" ? (
+                    <button
+                      onClick={() => updateSessionStatus(session._id, "ACTIVE")}
+                      className="flex-1 rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    >
+                      Activate
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => updateSessionStatus(session._id, "CLOSED")}
+                      className="flex-1 rounded-xl bg-rose-500 py-2.5 text-sm font-bold text-white transition hover:bg-rose-600"
+                    >
+                      Deactivate
+                    </button>
+                  )}
+                </div>
               </article>
             ))}
         </div>
@@ -270,6 +296,12 @@ const AdminPage = ({ onThemeToggle }) => {
           </article>
         ))}
       </div>
+      <BillModal
+        isOpen={showBill}
+        onClose={() => setShowBill(false)}
+        bill={billData}
+        tableNumber={selectedBillTable}
+      />
     </main>
   );
 };
